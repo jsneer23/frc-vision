@@ -572,6 +572,7 @@ name = "frc-vision"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "ipykernel" },
     { name = "jupyter" },
     { name = "matplotlib" },
     { name = "napa-vision" },
@@ -581,6 +582,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ipykernel", specifier = ">=7.4.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "napa-vision", specifier = ">=0.5.1" },

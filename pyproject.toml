@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "ipykernel>=7.4.0",
     "jupyter>=1.1.1",
     "matplotlib>=3.11.2",
     "napa-vision>=0.5.1",
@@ -21,3 +22,97 @@ frc-vision = "frc_vision:main"
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]
 build-backend = "uv_build"
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (unused imports, undefined names, etc.)
+    "N",     # pep8-naming
+    "S",     # flake8-bandit
+    "B",    # flake8-bugbear (likely bugs and design issues)
+    "I",    # isort (import ordering)
+    "C4",     # flake8-comprehensions
+    "TC",     # flake8-type-checking
+    "UP",   # pyupgrade (modernise Python syntax)
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+    "ASYNC",  # flake8-async
+    "ANN",    # flake8-annotations
+]
+ignore = [
+    "SIM108",  # ternary operator — often less readable in data-processing code
+    "B007",    # loop variable not used in body — common in timestamp iteration
+    "RUF001",  # en-dash in strings — intentional in human-readable output
+    "RUF002",  # multiplication sign in docstrings — intentional
+    "RUF003",  # multiplication sign in comments — intentional
+    # These are recommended by Ruff if the formatter is to be used: https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "W191",
+    "E111",
+    "E114",
+    "E117",
+    "D206",
+    "D300",
+    "Q000",
+    "Q001",
+    "Q002",
+    "Q003",
+    "COM812",
+    "COM819",
+    "ISC001",
+    "ISC002",
+     # for capital letter variable names, which are used for matricies
+    "N806",
+    "N803"
+]
+
+fixable = ["ALL"]
+unfixable = [
+    "E501",   # Ruff suggests their own formatting
+    "ERA"     # Leave commented-out code for reference purposes
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-wrap-aliases = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+
+# ---------------------------------------------------------------------------
+# pyright
+# ---------------------------------------------------------------------------
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+include = ["src"]
+exclude = [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/.*",
+    ".venv",
+]
+reportMissingImports = true
+reportUnusedImport = true
+reportUnusedVariable = true
+reportUntypedFunctionDecorator = false
+reportUnnecessaryTypeIgnoreComment = "warning"
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+

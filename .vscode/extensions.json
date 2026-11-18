@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "charliermarsh.ruff",
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "tamasfe.even-better-toml",
+    "FanaticPythoner.better-todo-tree",
+    "github.vscode-github-actions",
+  ]
+}
