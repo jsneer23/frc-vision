@@ -14,6 +14,7 @@ dependencies = [
     "napa-vision>=0.5.1",
     "numpy>=2.5.4",
     "opencv-python>=5.0.0.93",
+    "robotpy-apriltag>=2026.2.2",
 ]
 
 [project.scripts]

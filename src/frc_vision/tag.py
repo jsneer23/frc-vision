@@ -4,14 +4,10 @@ import numpy as np
 from numpy import bool_, float64
 from numpy.typing import NDArray
 
-S = 0.1651 / 2
-C = 0.1651 / 8
+from frc_vision.geometry import LATTICE, C
+
 TAG_FAMILY = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11)
 TAG_ID = 7
-
-g = np.linspace(-S, S, 9)
-XX, YY = np.meshgrid(g, g)
-lattice = np.column_stack((XX.ravel(), YY.ravel()))
 
 
 def generate_tag(tag_id: int) -> NDArray[np.bool_]:
@@ -25,7 +21,7 @@ def generate_tag(tag_id: int) -> NDArray[np.bool_]:
 
 def tag_corner_points(tag_id: int) -> NDArray[float64]:
     corner_matrix = tag_corner_matrix(tag_id)
-    return lattice[corner_matrix.ravel()]
+    return LATTICE[corner_matrix.ravel()]
 
 
 def tag_corner_matrix(tag_id: int) -> NDArray[bool_]:
@@ -40,7 +36,7 @@ def tag_corner_matrix(tag_id: int) -> NDArray[bool_]:
     c = cells[:-1, 1:]
     d = cells[1:, 1:]
 
-    # sum up the number of black cells
+    # sum up the number of white cells
     n = a + b + c + d
     # calculate if the cells diagonally across from one another are the same
     diagonal = (a == d) & (b == c)
