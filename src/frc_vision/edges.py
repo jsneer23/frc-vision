@@ -1,13 +1,19 @@
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
-from numpy import float64
+from numpy import bool_, float64
 from numpy.typing import NDArray
 
-from frc_vision.geometry import S
-from frc_vision.homography import make_H, project_all
-from frc_vision.render import Patch, add_noise, compose_frame, render_tag
-from frc_vision.tag import generate_tag
+from frc_vision.render import Patch
+
+
+@dataclass
+class EdgeProfiles:
+    pts: NDArray[float64]  # (4, n, 2)  profile centres, on the predicted edge
+    normals: NDArray[float64]  # (4, 2)     unit inward normal per side
+    s: NDArray[float64]  # (S,)       step offsets along the normal, px
+    values: NDArray[float64]  # (4, n, S)  brightness
 
 
 def edge_profiles(
@@ -73,7 +79,49 @@ def edge_profiles(
     return samples, profiles, s
 
 
+def find_crossings(
+    samples: NDArray[float64],
+    profiles: NDArray[float64],
+    n_level: int = 4,
+    min_contrast: float = 40.0,
+) -> tuple[NDArray[float64], NDArray[bool_]]:
+
+    # compute light and dark levels from the ends of each profile
+    light = profiles[..., :n_level].mean(axis=-1)
+    dark = profiles[..., -n_level:].mean(axis=-1)
+    # compute halfway level used to determine edge
+    mid = (light + dark) / 2
+
+    # compute first step at or below the midpoint
+    below = profiles <= mid[..., None]
+    j = np.argmax(below, axis=-1)  # argmax of a boolean array is index of the first True
+    found = below.any(axis=-1) & (j > 0)  # bool array for each profile checking midpoint found
+    j = np.maximum(j, 1)  # keep j-1 and j valid even where nothing was found
+
+    # find the brightness of the pixels just below and just above the midpoint
+    p0 = np.take_along_axis(profiles, (j - 1)[..., None], axis=-1)[..., 0]
+    p1 = np.take_along_axis(profiles, j[..., None], axis=-1)[..., 0]
+
+    # calculate the fractional distance between j-1 pixel and j pixel where midpoint falls
+    frac = (p0 - mid) / np.where(p0 != p1, p0 - p1, 1.0)  # how far from step j-1 to step j
+
+    # interpolate the (u, v) position of the midpoint
+    x0 = np.take_along_axis(samples, (j - 1)[..., None, None], axis=-2)[..., 0, :]
+    x1 = np.take_along_axis(samples, j[..., None, None], axis=-2)[..., 0, :]
+    points = x0 + frac[..., None] * (x1 - x0)
+
+    valid = found & (light - dark > min_contrast)
+    return points, valid
+
+
 def main() -> None:
+    from matplotlib import pyplot as plt
+
+    from frc_vision.geometry import S
+    from frc_vision.homography import make_H, project_all
+    from frc_vision.render import add_noise, compose_frame, render_tag
+    from frc_vision.tag import generate_tag
+
     rng = np.random.default_rng(2791)
     cells = generate_tag(7)
     H_true = make_H(30, 5, 1)
@@ -87,23 +135,59 @@ def main() -> None:
 
     samples, profiles, s = edge_profiles(noisy, corners)
 
-    starts_ = samples[:, :, 0, :].reshape(-1, 2)  # (80, 2)
-    ends_ = samples[:, :, -1, :].reshape(-1, 2)  # (80, 2)
+    points, valid = find_crossings(samples, profiles)
 
-    _, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 5))
+    # plot
+    starts_ = samples[:, :, 0, :].reshape(-1, 2)
+    ends_ = samples[:, :, -1, :].reshape(-1, 2)
+
+    _, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(11, 5))
+    pad = 20
+    xlim = (true_corners[:, 0].min() - pad, true_corners[:, 0].max() + pad)
+    ylim = (true_corners[:, 1].max() + pad, true_corners[:, 1].min() - pad)
+    box_aspect = (ylim[0] - ylim[1]) / (xlim[1] - xlim[0])  # height / width of the image view
+
     ax1.imshow(noisy.pixels, cmap="gray", vmin=0, vmax=255)
     ax1.plot([starts_[:, 0], ends_[:, 0]], [starts_[:, 1], ends_[:, 1]], c="orange", lw=0.8)
-    ax1.scatter(starts_[:, 0], starts_[:, 1], s=4, c="yellow")
-    ax1.scatter(corners[:, 0], corners[:, 1], s=30, marker="x", c="red")
-    ax1.scatter(true_corners[:, 0], true_corners[:, 1], s=30, marker="+", c="blue")
+    profile_lines = ax1.plot(
+        [starts_[:, 0], ends_[:, 0]], [starts_[:, 1], ends_[:, 1]], c="orange", lw=0.8
+    )
+    profile_lines[0].set_label("profiles")  # 80 lines: label only one so the legend lists it once
+    ax1.scatter(starts_[:, 0], starts_[:, 1], s=4, c="yellow", label="profile start (outside)")
+    ax1.scatter(corners[:, 0], corners[:, 1], s=30, marker="x", c="red", label="rough corners")
+    ax1.scatter(
+        true_corners[:, 0], true_corners[:, 1], s=30, marker="+", c="blue", label="true corners"
+    )
     pad = 20
     ax1.set_xlim(true_corners[:, 0].min() - pad, true_corners[:, 0].max() + pad)
     ax1.set_ylim(true_corners[:, 1].max() + pad, true_corners[:, 1].min() - pad)
     ax1.set_aspect("equal")
+    ax1.legend(loc="lower right", fontsize=8)
+    ax1.set_title("brightness profiles across each edge")
+    ax1.set_xlabel("u (px)")
+    ax1.set_ylabel("v (px)")
 
-    ax2.plot(s, profiles[0, :5].T)
+    ax2.plot(s, profiles[0, :5].T, label=[f"profile {i}" for i in range(5)])
+    ax2.legend(fontsize=8)
+    ax2.set_box_aspect(box_aspect)
+    ax2.set_title("brightness across the edge (side 0, first 5 profiles)")
     ax2.set_xlabel("offset along inward normal (px)")
     ax2.set_ylabel("brightness")
+
+    ax3.imshow(noisy.pixels, cmap="gray", vmin=0, vmax=255)
+    closed = np.vstack((true_corners, true_corners[:1]))
+    ax3.plot(closed[:, 0], closed[:, 1], c="blue", lw=0.6, label="true edges")
+    ax3.scatter(points[valid][:, 0], points[valid][:, 1], s=8, c="lime", label="edge points")
+    ax3.scatter(
+        points[~valid][:, 0], points[~valid][:, 1], s=20, marker="x", c="red", label="invalid"
+    )
+    ax3.set_xlim(xlim)
+    ax3.set_ylim(ylim)
+    ax3.set_aspect("equal")
+    ax3.legend(loc="lower right", fontsize=8)
+    ax3.set_title("measured edge points")
+    ax3.set_xlabel("u (px)")
+    ax3.set_ylabel("v (px)")
     plt.show()
 
 
